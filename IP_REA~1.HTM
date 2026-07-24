@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IP Investment Readiness Tool — Interactive Demo</title>
+<style>
+  :root{
+    --bg:#0f1424; --panel:#161d34; --panel2:#1d2545; --text:#eef1fb; --muted:#9aa4c7;
+    --accent:#6d8dff; --accent2:#9b6dff; --good:#3ecf8e; --warn:#f5a623; --bad:#ef5b5b;
+    --d1:#6d8dff; --d2:#31c4d8; --d3:#f5a623; --d4:#3ecf8e; --d5:#ef5b5b; --d6:#9b6dff;
+    --radius:18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:radial-gradient(1200px 800px at 20% -10%, #24305e 0%, var(--bg) 55%) fixed;
+    color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+  }
+  #app{max-width:920px;margin:0 auto;padding:28px 20px 80px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px;}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));}
+  .debug-toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;}
+  .switch{width:36px;height:20px;border-radius:20px;background:#2a3358;position:relative;transition:.2s;flex:none;}
+  .switch::after{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;}
+  .switch.on{background:linear-gradient(135deg,var(--accent),var(--accent2));}
+  .switch.on::after{left:18px;}
+
+  .progress-wrap{margin-bottom:22px;}
+  .progress-track{height:8px;border-radius:8px;background:#20284a;overflow:hidden;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .35s ease;}
+  .progress-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px;}
+
+  .card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid rgba(255,255,255,.06);
+    border-radius:var(--radius);padding:28px;box-shadow:0 20px 50px rgba(0,0,0,.35);}
+  .dim-tag{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.6px;
+    text-transform:uppercase;color:#0b0f1e;background:var(--tagcolor,var(--accent));padding:5px 12px;border-radius:100px;margin-bottom:16px;}
+  h1{font-size:26px;margin:0 0 10px;}
+  h2{font-size:21px;margin:0 0 14px;line-height:1.35;}
+  p.lead{color:var(--muted);font-size:15px;line-height:1.6;margin:0 0 18px;}
+  .framing{background:rgba(109,141,255,.08);border:1px solid rgba(109,141,255,.25);border-radius:12px;
+    padding:14px 16px;font-size:14px;color:#cfd6f2;margin-bottom:20px;line-height:1.55;}
+
+  .options{display:flex;flex-direction:column;gap:10px;}
+  .opt{background:#161d34;border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;
+    cursor:pointer;transition:.15s;text-align:left;}
+  .opt:hover{border-color:var(--accent);background:#1a2240;transform:translateY(-1px);}
+  .opt.selected{border-color:var(--accent);background:rgba(109,141,255,.14);}
+  .opt .opt-label{font-weight:600;font-size:15px;margin-bottom:4px;}
+  .opt .opt-ex{font-size:13px;color:var(--muted);line-height:1.5;}
+  .opt.opt-danger:hover, .opt.opt-danger.selected{border-color:var(--bad);background:rgba(239,91,91,.12);}
+
+  .btnrow{display:flex;justify-content:space-between;margin-top:24px;gap:10px;}
+  button.nav{background:var(--panel2);border:1px solid rgba(255,255,255,.1);color:var(--text);
+    padding:11px 20px;border-radius:12px;cursor:pointer;font-size:14px;font-weight:600;}
+  button.nav:disabled{opacity:.35;cursor:not-allowed;}
+  button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#0b0f1e;font-weight:700;}
+  button.primary:disabled{opacity:.4;}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,.15);color:var(--muted);}
+
+  .evi-row{background:#161d34;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;margin-bottom:12px;}
+  .evi-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;}
+  .evi-q{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:700;}
+  .evi-doc{font-size:14px;line-height:1.5;margin-top:4px;}
+  .evi-choices{display:flex;gap:8px;flex-wrap:wrap;}
+  .chip{padding:7px 13px;border-radius:100px;font-size:12.5px;font-weight:600;cursor:pointer;border:1.5px solid rgba(255,255,255,.12);background:#1d2545;}
+  .chip.full.active{background:rgba(62,207,142,.18);border-color:var(--good);color:var(--good);}
+  .chip.partial.active{background:rgba(245,166,35,.18);border-color:var(--warn);color:var(--warn);}
+  .chip.none.active{background:rgba(239,91,91,.18);border-color:var(--bad);color:var(--bad);}
+  .resolved-badge{font-size:11.5px;color:var(--good);font-weight:700;margin-top:8px;}
+  .reselect-box{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.15);}
+  .reselect-note{font-size:12.5px;color:var(--warn);margin-bottom:8px;}
+
+  .dash-overall{text-align:center;padding:30px 10px 10px;}
+  .band-pill{display:inline-block;padding:10px 26px;border-radius:100px;font-size:22px;font-weight:800;letter-spacing:.3px;}
+  .band-1{background:rgba(239,91,91,.18);color:#ff8080;border:1.5px solid var(--bad);}
+  .band-2{background:rgba(245,166,35,.18);color:#ffc266;border:1.5px solid var(--warn);}
+  .band-3{background:rgba(109,141,255,.18);color:#9db2ff;border:1.5px solid var(--accent);}
+  .band-4{background:rgba(155,109,255,.18);color:#c6aaff;border:1.5px solid var(--accent2);}
+  .band-5{background:rgba(62,207,142,.18);color:#7ce8b8;border:1.5px solid var(--good);}
+  .overall-sub{color:var(--muted);font-size:14px;margin-top:12px;}
+
+  .grid6{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:26px 0;}
+  @media(max-width:700px){.grid6{grid-template-columns:repeat(2,1fr);}}
+  .dcard{border-radius:14px;padding:14px;border:1px solid rgba(255,255,255,.08);background:#161d34;}
+  .dcard .dname{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;font-weight:700;color:var(--muted);margin-bottom:6px;}
+  .dcard .dband{font-size:15px;font-weight:700;}
+  .dcard .dbar{height:5px;border-radius:5px;background:#242c4e;margin-top:10px;overflow:hidden;}
+  .dcard .dbar > div{height:100%;}
+
+  .improve-tier{margin-top:8px;}
+  .tier-title{font-size:13px;text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin:22px 0 10px;color:var(--muted);}
+  .improve-item{border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,.08);}
+  .improve-item.critical{background:rgba(239,91,91,.08);border-color:rgba(239,91,91,.35);}
+  .improve-item.recommended{background:#161d34;}
+  .improve-item .ii-tag{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;}
+  .improve-item.critical .ii-tag{color:#ff8080;}
+  .improve-item.recommended .ii-tag{color:var(--accent);}
+  .improve-item .ii-issue{font-weight:700;margin:5px 0 4px;font-size:14.5px;}
+  .improve-item .ii-fix{font-size:13.5px;color:var(--muted);line-height:1.5;}
+
+  .review-box{background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.35);border-radius:14px;padding:20px;margin-bottom:18px;}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(245,166,35,.25);border-top-color:var(--warn);
+    animation:spin 1s linear infinite;margin:10px auto 16px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .debug-panel{margin-top:22px;background:#0d1122;border:1px dashed rgba(155,109,255,.4);border-radius:14px;padding:16px;font-size:12.5px;}
+  .debug-panel h4{margin:0 0 8px;color:var(--accent2);font-size:12.5px;text-transform:uppercase;letter-spacing:.4px;}
+  .debug-panel pre{white-space:pre-wrap;color:#b9c2e8;margin:0;font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.6;}
+
+  .intro-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:20px 0;}
+  @media(max-width:600px){.intro-grid{grid-template-columns:1fr;}}
+  .intro-dim{border-radius:12px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);background:#161d34;}
+  .intro-dim b{display:block;font-size:13.5px;}
+  .intro-dim span{font-size:12px;color:var(--muted);}
+
+  .footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =========================================================================
+   DATA MODEL
+   Sourced from D1_v4.0 / D2_v4.0 / D5.pdf / D3_D4_Scoring_Specification /
+   Merge score.pdf / framework_v4.0 (Design Rationale + Technical Spec).
+   D3/D4 answer sets are condensed from the source's qualitative tiers into
+   representative click options (the source docs give tier ranges/formulas,
+   not a fixed per-option list like D1/D2/D5 do).
+========================================================================= */
+
+const BAND_LABELS_STANDARD = [
+  null,
+  {name:"Not ready",   action:"Stop diligence on this asset now."},
+  {name:"Starting",    action:"Too early for a live deal; route to remediation."},
+  {name:"Developing",  action:"Do not fund on standard terms; requires escrow or staged tranches."},
+  {name:"Near-ready",  action:"Fundable with a defined closing checklist."},
+  {name:"Ready",       action:"Proceed to term sheet; no remediation needed."}
+];
+
+const BAND_LABELS_INVESTMENT = [
+  null,
+  {name:"Do Not Invest",              action:"Stop diligence on this asset now."},
+  {name:"Pre-Investment / Incubation",action:"Too early for a live deal; route to remediation track."},
+  {name:"Structured Deal Only",       action:"Do not fund on standard terms; requires escrow, staged tranches, or indemnity holdback."},
+  {name:"Conditional Approval",       action:"Fundable with a defined closing checklist; no deal-structure change needed."},
+  {name:"Investment-Grade",           action:"Proceed to term sheet; no remediation needed."}
+];
+
+function bandFromPercent(pct, thresholds){
+  // thresholds: ascending array of {max, idx}
+  for(const t of thresholds){ if(pct <= t.max) return t.idx; }
+  return thresholds[thresholds.length-1].idx;
+}
+const EVEN_BANDS = [{max:19,idx:1},{max:39,idx:2},{max:59,idx:3},{max:79,idx:4},{max:100,idx:5}];
+const D3D4_BANDS = [{max:39,idx:1},{max:59,idx:2},{max:74,idx:3},{max:89,idx:4},{max:100,idx:5}];
+
+/* ---------------- D1 ---------------- */
+const D1 = {
+  id:"D1", color:"var(--d1)", name:"Title & Ownership Clarity", owner:"Xinyu",
+  framing:"This checks if you have absolute legal control over your project, including the freedom to edit or adapt it without being sued by original creators, and the unquestionable right to raise funding.",
+  maxPoints:50, labelSet:BAND_LABELS_INVESTMENT, bandThresholds:EVEN_BANDS,
+  questions:[
+    {id:"Q1", text:"How did you agree on ownership with your main team (director/writer, producer/lead artist, or lead programmer)?",
+      evidence:"Signed IP assignment / ownership agreement(s) with all named main-team members",
+      options:[
+        {label:"Full written agreements", pts:15, exemplar:"Signed IP assignment contracts exist for film directors, music beat-makers, or core game code contributors."},
+        {label:"Some missing/unclear", pts:5, exemplar:"Standard contract templates used, but a featured guest artist or external scriptwriter hasn't signed yet.", improve:"Review all contracts immediately. Draft and sign formal retroactive assignment agreements for any missing lead talent before pitching to investors."},
+        {label:"Verbal/Chats only", pts:0, cap:1, exemplar:"Beat-maker paid in cash over WhatsApp, or a game designer shook hands with zero formal IP assignment paperwork.", improve:"STOP. An investor will reject this. You must legally secure core intellectual property rights with formal written contracts immediately."}
+      ]},
+    {id:"Q2", text:"Did the rest of your crew/contributors sign contracts giving up their IP rights?",
+      evidence:"Signed release / waiver forms from crew and contributors",
+      options:[
+        {label:"Yes, 100%", pts:10, exemplar:"All background actors, session musicians, and UI/asset artists signed standard release forms with IP waivers."},
+        {label:"Most signed", pts:5, exemplar:"Most crew signed, but an uncredited mixing engineer was paid via quick cash transfer without a waiver.", improve:"Locate missing session musicians or technical crew and have them sign standard IP release forms to close the gap."},
+        {label:"No", pts:0, cap:3, exemplar:"Rely entirely on informal cash-in-hand transactions for sound designers or QA debuggers.", improve:"Institute standard service contracts for all future hires and attempt retroactive signatures for current contributors."}
+      ]},
+    {id:"Q3", text:"Do you have co-creators (co-directors, co-writers, featured artists, or studio co-founders)?",
+      evidence:null,
+      options:[
+        {label:"Yes — I have co-creators", pts:0, exemplar:"The project involves multiple physical creators, triggering the need to verify formal legal delegation.", jump:"Q4"},
+        {label:"No — I am the sole creator", pts:10, exemplar:"The creator works completely alone; 100% of commercial decision-making power rests with them.", jump:"Q5"}
+      ]},
+    {id:"Q4", text:"Do you have a signed agreement designating final commercial-deal authority?", requiresJumpFrom:"Q3:Yes — I have co-creators",
+      evidence:"Signed delegation / operating agreement naming a single entity with sole commercial-deal authority",
+      options:[
+        {label:"One specific entity", pts:10, exemplar:"A signed 'Lead Creator' agreement designates one entity with sole legal authority to sign commercial deals."},
+        {label:"Unclear agreement", pts:5, exemplar:"A collaboration memo exists but fails to legally designate final commercial authority.", improve:"Amend your collaboration agreement to explicitly route licensing authority to a single investment vehicle."},
+        {label:"No agreement", pts:0, cap:2, exemplar:"No agreement exists, defaulting to joint authorship where any creator holds a commercial veto.", improve:"Sign an irrevocable rights-allocation agreement with your co-creators immediately to prevent commercial deadlocks."}
+      ]},
+    {id:"Q5", text:"Did the creators legally agree to let you edit, remix, patch, or alter the work in future?",
+      evidence:"Contract clause containing an explicit Moral Rights waiver (or economic-rights buyout documentation)",
+      options:[
+        {label:"Explicit written waivers", pts:10, exemplar:"Contracts explicitly waive Moral Rights, allowing future remixing, localization, or patching."},
+        {label:"Rights bought, no explicit waiver", pts:5, exemplar:"Economic rights are bought out, but the contract is silent on Moral Rights.", improve:"Add a clause waiving Moral Rights in your standard contracts to permit future derivatives."},
+        {label:"No", pts:0, cap:1, exemplar:"Contract states the original creator retains final approval over any edits or sequels.", improve:"Investors will not fund this. Renegotiate to remove the original creator's veto over derivative works."}
+      ]},
+    {id:"Q6", text:"Do you own the rights to make spin-offs, merchandise, sequels, or games based on this work?",
+      evidence:"Contract clause defining scope of derivative/ancillary rights (spin-offs, merchandise, sequels, games)",
+      options:[
+        {label:"Yes, unconditional global rights", pts:5, exemplar:"The production company fully owns the entire universe of the IP for all future formats."},
+        {label:"Some rights (split IP)", pts:2, exemplar:"The music group retains vinyl pressing rights, or a book author kept the game adaptation rights.", improve:"Ensure investors are aware which specific derivative rights are excluded from the current equity deal."},
+        {label:"No, single work only", pts:0, exemplar:"You only own the right to distribute this single master track; sequels are legally blocked.", improve:"Be prepared for a lower valuation, as expansion potential is legally blocked."}
+      ]}
+  ]
+};
+
+/* ---------------- D2 ---------------- */
+const D2 = {
+  id:"D2", color:"var(--d2)", name:"Licensability", owner:"Xinyu",
+  framing:"This checks if your legally owned IP is a 'clean asset' capable of generating revenue, free from historical encumbrances, and whether its economic rights can be freely transferred and commercialised.",
+  maxPoints:70, labelSet:BAND_LABELS_INVESTMENT, bandThresholds:EVEN_BANDS,
+  questions:[
+    {id:"Q1", text:"Have you ever signed away exclusive rights to this work to a distributor in the past?",
+      evidence:"Historical distribution/licensing agreements, or a signed statement confirming none were ever granted",
+      options:[
+        {label:"No", pts:15, exemplar:"Zero active exclusive licenses; full commercial autonomy."},
+        {label:"Minor regional deals", pts:5, exemplar:"Part of the world is blocked (e.g. a 2-year West Africa deal), but global rights are free.", improve:"Compile a clear list of all active regional licenses and their expiration dates for the investor."},
+        {label:"Yes, long-term global rights", pts:0, cap:1, exemplar:"Already sold what you are trying to raise money for.", improve:"You cannot raise funds using this asset. Focus on creating new, unencumbered IP."}
+      ]},
+    {id:"Q2", text:"Is this project currently being used as collateral for an active loan?",
+      evidence:"Certificate of No Encumbrance from the National Collateral Registry (NCR), or loan payoff / lien-discharge documentation",
+      options:[
+        {label:"No", pts:15, exemplar:"Have an official Certificate of No Encumbrance from the NCR."},
+        {label:"Loan paid, registry not updated", pts:5, exemplar:"The paperwork is delayed.", improve:"Push your lender to formally deregister the lien with the NCR to provide proof to new investors."},
+        {label:"Yes", pts:0, cap:3, exemplar:"Actively pledged against a loan, or in a legal dispute over ownership.", improve:"You must legally clear all existing liens before a new investor can inject equity."}
+      ]},
+    {id:"Q3", text:"Do you retain 100% of the commercial revenue, or are you obligated to split royalties?",
+      evidence:"Distribution/publishing agreement or royalty statements showing revenue retention or split terms",
+      options:[
+        {label:"We retain 100% of the revenue", pts:20, exemplar:"No external revenue sharing is required; the entity receives all digital royalties.", jump:"Q5"},
+        {label:"We are obligated to split revenue", pts:0, exemplar:"Royalties must be divided among co-creators, band members, or publishers.", improve:"Acknowledge the revenue-sharing obligation and formally document all exact percentage splits.", jump:"Q4"}
+      ]},
+    {id:"Q4", text:"How is this revenue division formalised and documented with your partners?", requiresJumpFrom:"Q3:We are obligated to split revenue",
+      evidence:"Signed Split Sheet(s) formalizing revenue division",
+      options:[
+        {label:"Signed Split Sheets", pts:15, exemplar:"Industry-standard Split Sheets automatically pay everyone the exact percentage."},
+        {label:"Verbal agreements", pts:10, exemplar:"It's not formalised; verbal agreements or informal memos only.", improve:"Draft and sign formal split-sheet legal structures before royalties are realised, to prevent disputes."},
+        {label:"Figure it out later", pts:0, exemplar:"Ad-hoc post-realisation splitting; figure it out when the money arrives.", improve:"This is a massive red flag for financial auditors. Document exact percentage breakdowns immediately."}
+      ]},
+    {id:"Q5", text:"Are the economic rights of this IP legally separable and freely transferable to a third-party investor?",
+      evidence:"Contract clause on assignability of economic rights (or legal opinion confirming separability)",
+      options:[
+        {label:"Yes, explicitly transferable", pts:10, exemplar:"Contracts explicitly allow assignment of revenue rights to an SPV or third-party investor."},
+        {label:"Unclear", pts:5, exemplar:"Contracts do not explicitly forbid transfer, but lack clear assignment clauses.", improve:"Amend existing agreements to explicitly permit legal assignment of economic rights to an external vehicle."},
+        {label:"No, tied to creator", pts:0, cap:2, exemplar:"Economic rights are strictly non-transferable and tied to the original creators.", improve:"Renegotiate core terms to uncouple economic rights from the creators."}
+      ]},
+    {id:"Q6", text:"Do you have a documented history of non-exclusive licensing deals demonstrating this asset's commercial viability?",
+      evidence:"Prior non-exclusive licensing agreements / deal records",
+      options:[
+        {label:"Documented history", pts:10, exemplar:"A track record of clear, written non-exclusive commercial licensing agreements exists."},
+        {label:"Informal past deals", pts:5, exemplar:"Past licensing occurred, but mostly through verbal agreements or unstructured emails.", improve:"Formalize past licensing arrangements into written contracts for a verifiable commercial track record."},
+        {label:"No history", pts:0, exemplar:"The IP has never been licensed commercially, making market acceptance unproven.", improve:"Seek a first non-exclusive licensing deal, even a small one, to begin establishing a track record."}
+      ]}
+  ]
+};
+
+/* ---------------- D5 ---------------- */
+const D5 = {
+  id:"D5", color:"var(--d5)", name:"Risk & Infringement Exposure", owner:"Ziyang",
+  framing:"Investors need to ensure that your creative and technological assets are safe from third-party claims, digital piracy, unauthorized AI scraping, and technical vulnerabilities that could destroy their market value.",
+  maxPoints:10, labelSet:BAND_LABELS_STANDARD, bandThresholds:EVEN_BANDS,
+  questions:[
+    {id:"Q1", text:"Are your datasets, source code, or creative catalogs protected against unauthorized AI scraping?",
+      evidence:"Technical protection evidence: robots.txt / AI-crawler blocklist export, API access-control, or the Terms of Service clause relied upon",
+      options:[
+        {label:"Yes — strict technical blockers and API paywalls", pts:2, exemplar:"Robots.txt, anti-bot paywalls, and user-agent restrictions actively block AI scrapers."},
+        {label:"Partial protection via Terms of Service only", pts:1, exemplar:"Legal terms prohibit data mining, but no software stops automated crawlers."},
+        {label:"Not sure or haven't assessed AI threats", pts:0, cap:3, exemplar:"The catalog is online, but its usage in foreign AI training sets is unmonitored.", improve:"Update your robots.txt to block known AI crawlers (e.g. GPTBot); add opt-out metadata tags."},
+        {label:"No — publicly hosted and completely unprotected", pts:0, cap:2, exemplar:"Raw media/data is exposed and actively extracted by AI bots for free.", improve:"Deploy technical blockers immediately; unmonitored assets have no defensible scarcity."}
+      ]},
+    {id:"Q2", text:"What mechanisms prevent revenue loss from digital piracy and unauthorized distribution?",
+      evidence:"Anti-piracy evidence: DRM vendor agreement or platform DRM configuration, digital fingerprinting / Content ID confirmation, and takedown logs",
+      options:[
+        {label:"Comprehensive DRM and active automated takedowns", pts:2, exemplar:"Broadcast-grade encryption, secure players, and 24/7 anti-piracy sweeps are deployed."},
+        {label:"Basic protection (watermarks or Content ID)", pts:1, exemplar:"Videos are uploaded to YouTube Content ID to automatically monetize or block re-uploads."},
+        {label:"Passive response only (DMCA when alerted)", pts:0, cap:3, exemplar:"Takedown notices are issued manually only after piracy is discovered.", improve:"Implement DRM and register your catalog with automated digital fingerprinting systems."},
+        {label:"No protection or DRM mechanism", pts:0, cap:2, exemplar:"Unencrypted media or raw software is distributed, allowing easy copying.", improve:"DRM deployment is a precondition to further diligence — unprotected distribution displaces licensed revenue."}
+      ]},
+    {id:"Q3", text:"For software/tech: does your codebase include OSS components, audited for infectious 'Copyleft' licences?",
+      evidence:"Software Composition Analysis (SCA) or dependency licence report listing every OSS component and its licence type",
+      options:[
+        {label:"N/A or permissive licences only", pts:2, exemplar:"A dependency tree scan confirms no infectious or copyleft licences exist."},
+        {label:"OSS used but unaudited", pts:1, cap:4, exemplar:"Open-source components are used, but exact licence types are unverified.", improve:"Run an automated Software Composition Analysis (SCA) tool on your codebase."},
+        {label:"Yes — Copyleft integrated into proprietary code", pts:0, cap:2, exemplar:"GPL/AGPL code is merged with proprietary code, risking algorithm secrecy.", improve:"Refactor to isolate or replace copyleft components with permissive licences (MIT/Apache)."},
+        {label:"Yes — facing forced code disclosure demands", pts:0, cap:1, exemplar:"Legal demands force you to open-source all proprietary code.", improve:"An active disclosure demand attacks the proprietary core of the asset — stop diligence now."}
+      ]},
+    {id:"Q4", text:"For film/media: have you obtained written clearance for BOTH synchronization and master use rights for all third-party music?",
+      evidence:"Signed synchronization and master use licences for every third-party track",
+      options:[
+        {label:"N/A or 100% original", pts:2, exemplar:"The entire soundtrack is scored in-house under Work-for-Hire contracts."},
+        {label:"Yes — dual rights cleared in writing", pts:2, exemplar:"Written sync and master use contracts are signed for every third-party track."},
+        {label:"Pending or temporary festival clearance only", pts:1, cap:3, exemplar:"Commercial terms are negotiated, but final written execution is pending.", improve:"Hold back consideration until final licences execute."},
+        {label:"Only one right or oral clearance", pts:0, cap:2, exemplar:"Artist permission was obtained, but the songwriter's publisher was ignored.", improve:"Secure both sync and master licences in writing."},
+        {label:"No formal clearance", pts:0, cap:1, exemplar:"Commercial music tracks are used with zero written permissions.", improve:"Unlicensed third-party music is a fatal infringement defect — stop diligence now."}
+      ]},
+    {id:"Q5", text:"Are there any pending lawsuits, copyright strikes, or royalty disputes affecting your assets?",
+      evidence:"Signed settlement release form, or a formal legal opinion letter quantifying active risks",
+      options:[
+        {label:"No current or historical disputes", pts:2, exemplar:"No lawsuits, claims, or licensing conflicts anywhere in the portfolio."},
+        {label:"Historical disputes settled via binding release", pts:2, exemplar:"A settlement with a liability waiver has cleared historical legal risks."},
+        {label:"Exposed to systemic macro royalty disputes", pts:1, cap:4, exemplar:"Assets are legally clear, but payment is delayed due to CMO/tax collection gridlock.", improve:"Price cash-flow timing risk explicitly into the model."},
+        {label:"Minor dispute under appeal", pts:0, cap:3, exemplar:"An automated copyright claim was triggered and is under platform mediation.", improve:"Escrow proceeds pending resolution of the appeal."},
+        {label:"Active major litigation or platform takedown", pts:0, cap:1, exemplar:"An active lawsuit is running, or a streaming platform delisted the asset.", improve:"Investors categorically halt deals with active, unquantified IP lawsuits — stop diligence now."}
+      ]}
+  ]
+};
+
+/* ---------------- D3 (weighted engine, Willow's own scoring standard) ---------------- */
+const D3 = {
+  id:"D3", color:"var(--d3)", name:"Revenue Track Record", owner:"Willow", weighted:true,
+  framing:"D3 asks one question: can the income be trusted and collected? Weak evidence caps the score, not the asset.",
+  labelSet:BAND_LABELS_STANDARD, bandThresholds:D3D4_BANDS,
+  questions:[
+    {id:"Q1", varName:"A", text:"How long has this IP generated income?",
+      evidence:"Continuous platform, distributor, royalty, cinema, broadcast, or settlement records",
+      options:[
+        {label:"No record, or under 6 months", value:0},
+        {label:"6–11 months of income", value:50},
+        {label:"12–23 months of income", value:75},
+        {label:"24+ months, no gap over 3 months", value:100}
+      ]},
+    {id:"Q2", varName:"B", text:"What evidence proves the income?",
+      evidence:"Match each payment to third-party proof: IP title, period, payer, amount, date",
+      options:[
+        {label:"No evidence at all", value:0, flag:"noEvidence"},
+        {label:"Self-made records only (personal ledger/cash receipts)", value:25},
+        {label:"Standalone CMO or manager/label statement only", value:25, flag:"auditFlag"},
+        {label:"Statement plus matching payment or contract proof", value:50},
+        {label:"Direct platform dashboard, or CMO statement + bank proof", value:75},
+        {label:"Multiple matching documents (multi-source cross-verified)", value:100},
+        {label:"Documents provided but they conflict with each other", value:0, flag:"mismatch"}
+      ]},
+    {id:"Q3", varName:"C", text:"How repeatable is the income pattern?",
+      evidence:"Quarterly receipts, or a verified external reason for any drop",
+      options:[
+        {label:"Irregular — one or two payments ever", value:0},
+        {label:"Seasonal or quarterly but volatile", value:50},
+        {label:"A drop is explained by a verified external event", value:75},
+        {label:"Quarterly and mostly steady", value:100}
+      ]},
+    {id:"Q4", varName:"D", text:"Where did income come from in the past 12 months?",
+      evidence:"Verified channels beyond a single dominant source",
+      options:[
+        {label:"No source, or one source only", value:0},
+        {label:"Two sources, one dominant (40–70%)", value:50},
+        {label:"Two balanced sources", value:75},
+        {label:"Three or more balanced sources", value:100}
+      ],
+      followupCheckbox:{label:"One single work drives more than 60% of catalogue revenue (single-work dependency)", capsD:50}},
+    {id:"Q5", varName:null, text:"Are revenue rights restricted (unrecouped advance, pledged as loan collateral, or unsigned co-owner split)?",
+      evidence:"Recoupment statement, security release, or signed co-owner agreement",
+      options:[
+        {label:"No — rights are fully clear", value:0},
+        {label:"Not sure", value:0, cap59:true},
+        {label:"Yes — advance not fully recouped", value:0, cap59:true},
+        {label:"Yes — future income pledged for a loan", value:0, cap59:true},
+        {label:"Yes — co-owners exist with no signed agreement", value:0, cap59:true}
+      ]}
+  ]
+};
+
+/* ---------------- D4 (weighted engine, Willow's own scoring standard) ---------------- */
+const D4 = {
+  id:"D4", color:"var(--d4)", name:"Market Traction", owner:"Willow", weighted:true,
+  framing:"D4 asks one question: is the audience real, retained, and monetisable? Anomaly does not equal automatic penalty — evidence determines the outcome.",
+  labelSet:BAND_LABELS_STANDARD, bandThresholds:D3D4_BANDS,
+  questions:[
+    {id:"Q1", varName:"F", text:"What official audience proof exists?",
+      evidence:"Official platform, distributor, cinema, broadcast, or streaming backend export",
+      options:[
+        {label:"No official proof", value:0},
+        {label:"Social-media metrics only", value:35},
+        {label:"Official platform data, but below traction threshold", value:50},
+        {label:"Official traction above threshold", value:70},
+        {label:"Strong platform numbers plus outside recognition", value:100}
+      ]},
+    {id:"Q2", varName:"G", text:"Does demand persist over time?",
+      evidence:"6–12 months of stable demand, or older works still drawing activity",
+      options:[
+        {label:"Too new to tell, or already dropped", value:0},
+        {label:"One recent work driving all activity", value:50},
+        {label:"Stable across a small back catalogue", value:75},
+        {label:"Growing, or older works still active", value:100}
+      ]},
+    {id:"Q3", varName:"H", text:"Where is the audience located?",
+      evidence:"Location data and income-by-country or income-by-region records",
+      options:[
+        {label:"No audience location data", value:0},
+        {label:"Mostly domestic / low-monetisation regions", value:50},
+        {label:"15–30% of audience from higher-paying overseas markets", value:75},
+        {label:"Over 30% overseas, with region-level income records", value:100}
+      ]},
+    {id:"Q4", varName:"I", text:"Has traction crossed into paid or recognised demand?",
+      evidence:"Signed deals, invoices, chart records, official selections, or recognised media features",
+      options:[
+        {label:"No B2B monetisation or external recognition", value:0},
+        {label:"Outreach intent only (LOIs, pitch decks)", value:50},
+        {label:"One completed paid deal or one authoritative recognition", value:75},
+        {label:"Two or more completed paid deals in 12 months", value:100}
+      ]}
+  ],
+  q5controls:[
+    {id:"Q5A", label:"Cross-Metric Mismatch", desc:"Do plays/views line up with engagement, followers, and income?", evidence:"Paid-ad invoices or a backend screen recording of organic traffic"},
+    {id:"Q5B", label:"Geographic Concentration (>90%)", desc:"Is one region driving over 90% of plays?", evidence:"Local ticket sales, tour contracts, or radio campaign invoices for that region"},
+    {id:"Q5C", label:"Playlist Concentration (>80%)", desc:"Is a single playlist driving over 80% of traffic?", evidence:"Playlist-source metadata and communications with the curator"},
+    {id:"Q5D", label:"Traffic Spike (>200% MoM, >30,000 absolute)", desc:"Is a sudden traffic spike explained?", evidence:"Press release, editorial feature, or paid campaign invoice matching the spike"}
+  ]
+};
+
+const ALL_DIMS = [D1,D2,D3,D4,D5];
+
+/* =========================================================================
+   STATE
+========================================================================= */
+let state = {
+  screen:"intro",              // intro | q | evidence | manualReview | results
+  dimIndex:0,
+  qIndex:0,
+  answers:{},                  // answers[dimId][qId] = optionObj (or value for controls)
+  history:[],                  // navigation stack of {dimIndex,qIndex}
+  evidenceState:{},            // evidenceState[dimId][qId] = 'full'|'partial'|'none'
+  q5controls:{},               // D4 control states
+  debug:false,
+  reselectOpenKey:null         // "dimId:qId" currently showing inline reselect
+};
+
+function activeQuestions(dim){
+  // returns question list honoring skip/jump logic based on current answers
+  const seq = [];
+  let idx = 0;
+  const byId = {}; dim.questions.forEach(q=>byId[q.id]=q);
+  let cur = dim.questions[0].id;
+  const visited = new Set();
+  while(cur && byId[cur] && !visited.has(cur)){
+    visited.add(cur);
+    seq.push(byId[cur]);
+    const ans = state.answers[dim.id] && state.answers[dim.id][cur];
+    if(ans && ans.jump){ cur = ans.jump; }
+    else {
+      const i = dim.questions.findIndex(q=>q.id===cur);
+      cur = dim.questions[i+1] ? dim.questions[i+1].id : null;
+      // skip questions that require a jump-from condition not met
+      while(cur && byId[cur] && byId[cur].requiresJumpFrom){
+        const [reqQ, reqLabel] = byId[cur].requiresJumpFrom.split(":");
+        const reqAns = state.answers[dim.id] && state.answers[dim.id][reqQ];
+        if(reqAns && reqAns.label === reqLabel) break;
+        const i2 = dim.questions.findIndex(q=>q.id===cur);
+        cur = dim.questions[i2+1] ? dim.questions[i2+1].id : null;
+      }
+    }
+  }
+  return seq;
+}
+
+/* =========================================================================
+   SCORING ENGINE
+========================================================================= */
+function evidenceDiscount(dimId, qId, pts){
+  const st = (state.evidenceState[dimId]||{})[qId];
+  if(st === "partial") return pts*0.6;   // 40% discount
+  if(st === "none") return pts*0.2;      // 80% discount
+  return pts; // full or unset (unset = not yet reached evidence stage; used for provisional display)
+}
+
+function computeD1D2D5(dim){
+  const qs = activeQuestions(dim); // every active question (including D1's Q3) carries real points and counts toward the sum
+  let earned = 0, cap = 5;
+  const rows = [];
+  qs.forEach(q=>{
+    const ans = (state.answers[dim.id]||{})[q.id];
+    if(!ans) return;
+    let pts = ans.pts||0;
+    const discounted = evidenceDiscount(dim.id, q.id, pts);
+    earned += discounted;
+    if(ans.cap) cap = Math.min(cap, ans.cap);
+    rows.push({q:q.id, text:q.text, chosen:ans.label, pts, discounted, cap:ans.cap||null});
+  });
+  const pct = Math.round((earned/dim.maxPoints)*100);
+  let band = bandFromPercent(Math.max(0,Math.min(100,pct)), dim.bandThresholds);
+  band = Math.min(band, cap);
+  return {pct, band, cap, rows, earned};
+}
+
+function computeD3(){
+  const A = getVal(D3,"Q1"), Braw = getVal(D3,"Q2"), Craw = getVal(D3,"Q3"), Draw = getVal(D3,"Q4");
+  const q2ans = (state.answers.D3||{}).Q2;
+  const q4ans = (state.answers.D3||{}).Q4;
+  const q5ans = (state.answers.D3||{}).Q5;
+  const singleWork = state.q3singleWork;
+
+  const bFullyDiscounted = discountedVar("D3","Q2",Braw);
+  const cAdj = bFullyDiscounted<=50 ? Craw*0.5 : discountedVar("D3","Q3",Craw);
+  let dFinal = discountedVar("D3","Q4",Draw);
+  if(singleWork) dFinal = Math.min(dFinal,50);
+
+  const preCap = (A*0.44 + cAdj*0.56)*0.45 + bFullyDiscounted*0.35 + dFinal*0.20;
+  let cap39 = q2ans && (q2ans.flag==="noEvidence"||q2ans.flag==="mismatch");
+  let cap59 = q5ans && q5ans.cap59;
+  let final = preCap;
+  if(cap39) final = Math.min(final,39);
+  if(cap59) final = Math.min(final,59);
+  final = Math.round(final);
+  const band = bandFromPercent(Math.max(0,Math.min(100,final)), D3D4_BANDS);
+  return {pct:final, band, cap39, cap59, A, B:bFullyDiscounted, C:cAdj, D:dFinal};
+}
+
+function computeD4(){
+  const F0 = getVal(D4,"Q1"), G0 = getVal(D4,"Q2"), H0 = discountedVar("D4","Q3",getVal(D4,"Q3")), I0 = discountedVar("D4","Q4",getVal(D4,"Q4"));
+  const controls = state.q5controls||{};
+  const confirmedCount = Object.values(controls).filter(v=>v==="confirmed").length;
+  let F = discountedVar("D4","Q1",F0), G = discountedVar("D4","Q2",G0);
+  if(confirmedCount>=1){ F = Math.min(F,35); G = G*0.5; }
+  const finalScore = Math.round(F*0.30 + G*0.25 + H0*0.25 + I0*0.20);
+  const band = bandFromPercent(Math.max(0,Math.min(100,finalScore)), D3D4_BANDS);
+  return {pct:finalScore, band, confirmedCount, F, G, H:H0, I:I0};
+}
+
+function getVal(dim,qId){
+  const ans = (state.answers[dim.id]||{})[qId];
+  return ans ? ans.value : 0;
+}
+function discountedVar(dimId,qId,val){
+  const st = (state.evidenceState[dimId]||{})[qId];
+  if(st==="partial") return val*0.6;
+  if(st==="none") return val*0.2;
+  return val;
+}
+
+function computeDimResult(dim){
+  if(dim.weighted) return dim.id==="D3" ? computeD3() : computeD4();
+  return computeD1D2D5(dim);
+}
+
+function allDimResults(){
+  const out = {};
+  ALL_DIMS.forEach(d=> out[d.id]=computeDimResult(d));
+  return out;
+}
+
+function overallBand(results){
+  const bands = ALL_DIMS.map(d=>results[d.id].band);
+  const mean = bands.reduce((a,b)=>a+b,0)/5;
+  let prelim = Math.round(mean + 1e-9); // .5 rounds up
+  if((mean*2)%2===1) prelim = Math.ceil(mean);
+  const lowest = Math.min(...bands);
+  const final = Math.min(prelim, lowest+1);
+  return {mean, prelim, lowest, final};
+}
+
+/* =========================================================================
+   EVIDENCE CHECKLIST ITEMS
+========================================================================= */
+function evidenceChecklist(){
+  const items = [];
+  ALL_DIMS.forEach(dim=>{
+    const qs = activeQuestions(dim);
+    qs.forEach(q=>{
+      if(!q.evidence) return;
+      const ans = (state.answers[dim.id]||{})[q.id];
+      if(!ans) return;
+      items.push({dimId:dim.id, dimName:dim.name, dimColor:dim.color, qId:q.id, qText:q.text,
+        docText:q.evidence, weighted: !!dim.weighted, question:q, answer:ans});
+    });
+  });
+  return items;
+}
+
+/* =========================================================================
+   IMPROVEMENT LIST
+========================================================================= */
+function improvementList(results){
+  const critical = [], recommended = [];
+  ALL_DIMS.forEach(dim=>{
+    if(dim.weighted) return; // handled separately below
+    const qs = activeQuestions(dim).filter(q=>q.options.every(o=>o.pts!==undefined));
+    qs.forEach(q=>{
+      const ans = (state.answers[dim.id]||{})[q.id];
+      if(!ans || !ans.improve) return;
+      const evi = (state.evidenceState[dim.id]||{})[q.id];
+      const isCapped = !!ans.cap;
+      const isDiscounted = evi==="partial"||evi==="none";
+      const item = {dim:dim.name, color:dim.color, issue: ans.label+" ("+q.text.replace(/\?$/,"")+")", fix:ans.improve};
+      if(isCapped || isDiscounted) critical.push(item); else recommended.push(item);
+    });
+  });
+  // D3/D4 weighted dimensions: flag caps + confirmed controls as critical
+  const q5D3 = (state.answers.D3||{}).Q5;
+  if(q5D3 && q5D3.cap59){
+    critical.push({dim:"Revenue Track Record", color:D3.color, issue:q5D3.label+" (revenue rights restricted)",
+      fix:"Resolve the recoupment balance, loan pledge, or co-owner agreement before this can score above Starting."});
+  }
+  const q2D3 = (state.answers.D3||{}).Q2;
+  if(q2D3 && (q2D3.flag==="noEvidence"||q2D3.flag==="mismatch")){
+    critical.push({dim:"Revenue Track Record", color:D3.color, issue:q2D3.label,
+      fix:"Provide matching third-party proof (platform, distributor, bank) for every claimed income figure."});
+  } else if(q2D3 && q2D3.flag==="auditFlag"){
+    recommended.push({dim:"Revenue Track Record", color:D3.color, issue:q2D3.label,
+      fix:"A standalone CMO/manager statement is an audit flag — add a matching bank or contract record."});
+  }
+  const confirmed = Object.entries(state.q5controls||{}).filter(([k,v])=>v==="confirmed");
+  confirmed.forEach(([k])=>{
+    const c = D4.q5controls.find(c=>c.id===k);
+    critical.push({dim:"Market Traction", color:D4.color, issue:c.label+" — confirmed anomaly",
+      fix:"Provide "+c.evidence.toLowerCase()+" to clear this flag, or accept the authenticity penalty on this dimension."});
+  });
+  return {critical, recommended};
+}
+
+/* =========================================================================
+   RENDERING
+========================================================================= */
+const app = document.getElementById("app");
+
+function render(){
+  let html = `<div class="topbar">
+    <div class="brand"><div class="dot"></div> IP Investment Readiness — Demo</div>
+    <div class="debug-toggle" onclick="toggleDebug()">
+      <span>Sponsor view: show internals</span>
+      <div class="switch ${state.debug?'on':''}"></div>
+    </div>
+  </div>`;
+
+  if(state.screen==="intro") html += renderIntro();
+  else if(state.screen==="q") html += renderQuestion();
+  else if(state.screen==="evidence") html += renderEvidence();
+  else if(state.screen==="manualReview") html += renderManualReview();
+  else if(state.screen==="results") html += renderResults();
+
+  app.innerHTML = html;
+}
+
+function toggleDebug(){ state.debug = !state.debug; render(); }
+
+function renderIntro(){
+  return `<div class="card">
+    <div class="dim-tag" style="--tagcolor:var(--accent)">Group 11 · BE 605</div>
+    <h1>IP Investment Readiness Tool</h1>
+    <p class="lead">Answer a short guided interview across six dimensions. You'll get one overall readiness band, a band for every dimension, and a two-tier list of exactly what to fix next — modeled on the team's framework v4.0 aggregation rules.</p>
+    <div class="intro-grid">
+      <div class="intro-dim" style="border-color:${D1.color}55"><b style="color:${D1.color}">D1 · Title &amp; Ownership</b><span>Do you cleanly own it?</span></div>
+      <div class="intro-dim" style="border-color:${D2.color}55"><b style="color:${D2.color}">D2 · Licensability</b><span>Can it be commercialised?</span></div>
+      <div class="intro-dim" style="border-color:${D3.color}55"><b style="color:${D3.color}">D3 · Revenue Track Record</b><span>Has it earned money, provably?</span></div>
+      <div class="intro-dim" style="border-color:${D4.color}55"><b style="color:${D4.color}">D4 · Market Traction</b><span>Is there real, lasting demand?</span></div>
+      <div class="intro-dim" style="border-color:${D5.color}55"><b style="color:${D5.color}">D5 · Risk &amp; Infringement</b><span>What could erode its value?</span></div>
+      <div class="intro-dim" style="border-color:var(--d6)55"><b style="color:var(--d6)">D6 · Documentation</b><span>Can you prove all of the above?</span></div>
+    </div>
+    <button class="nav primary" style="width:100%;padding:15px;font-size:15px;" onclick="startSurvey()">Start the interview →</button>
+  </div>`;
+}
+
+function currentDim(){ return ALL_DIMS[state.dimIndex]; }
+
+function startSurvey(){
+  state.screen="q"; state.dimIndex=0; state.qIndex=0;
+  render();
+}
+
+function renderQuestion(){
+  const dim = currentDim();
+  const qs = activeQuestions(dim);
+  const q = qs[state.qIndex];
+  const totalQ = ALL_DIMS.reduce((a,d)=>a+d.questions.length,0);
+  let doneQ = 0; for(let i=0;i<state.dimIndex;i++) doneQ += ALL_DIMS[i].questions.length; doneQ += state.qIndex;
+  const pct = Math.round((doneQ/totalQ)*100);
+
+  let body = "";
+  if(dim.id==="D4" && q===undefined){
+    // reached end of D4 main questions -> go to Q5 controls inline
+    return renderD4Controls(pct);
+  }
+
+  const savedAns = (state.answers[dim.id]||{})[q.id];
+  const isWeighted = !!dim.weighted;
+
+  body += `<div class="dim-tag" style="--tagcolor:${dim.color}">${dim.name}${isWeighted?" · "+q.varName+" variable":""}</div>`;
+  if(state.qIndex===0){
+    body += `<div class="framing">${dim.framing}</div>`;
+  }
+  body += `<h2>${q.text}</h2>`;
+  body += `<div class="options">`;
+  q.options.forEach((opt,i)=>{
+    const selected = savedAns && savedAns.label===opt.label;
+    const danger = opt.cap===1 || opt.cap59;
+    body += `<div class="opt ${selected?'selected':''} ${danger?'opt-danger':''}" onclick="selectOption('${q.id}',${i})">
+      <div class="opt-label">${opt.label}</div>
+      ${opt.exemplar?`<div class="opt-ex">${opt.exemplar}</div>`:""}
+    </div>`;
+  });
+  if(q.followupCheckbox){
+    const checked = state.q3singleWork;
+    body += `<div class="opt" style="cursor:pointer;margin-top:4px;" onclick="toggleSingleWork()">
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;">
+        <input type="checkbox" ${checked?"checked":""} style="margin-top:3px;" onclick="event.stopPropagation();toggleSingleWork()">
+        <span class="opt-ex">${q.followupCheckbox.label}</span>
+      </label>
+    </div>`;
+  }
+  body += `</div>`;
+
+  body += `<div class="btnrow">
+    <button class="nav" onclick="goBack()" ${(state.dimIndex===0&&state.qIndex===0)?"disabled":""}>← Back</button>
+    <button class="nav primary" onclick="goNext()" ${savedAns?"":"disabled"}>Continue →</button>
+  </div>`;
+
+  return `<div class="progress-wrap"><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="progress-label"><span>D1–D5 guided interview</span><span>${pct}%</span></div></div>
+    <div class="card">${body}</div>`;
+}
+
+function toggleSingleWork(){ state.q3singleWork = !state.q3singleWork; render(); }
+
+function selectOption(qId, i){
+  const dim = currentDim();
+  const opt = dim.questions.find(q=>q.id===qId).options[i];
+  if(!state.answers[dim.id]) state.answers[dim.id] = {};
+  state.answers[dim.id][qId] = opt;
+  render();
+}
+
+function goNext(){
+  const dim = currentDim();
+  const qs = activeQuestions(dim);
+  if(state.qIndex < qs.length-1){ state.qIndex++; render(); return; }
+  if(dim.id==="D4"){ state.screen="q"; state.qIndex=qs.length; render(); return; } // -> renderD4Controls via renderQuestion guard
+  // move to next dimension
+  if(state.dimIndex < ALL_DIMS.length-1){ state.dimIndex++; state.qIndex=0; render(); }
+  else { state.screen="evidence"; render(); }
+}
+function goBack(){
+  if(state.qIndex>0){ state.qIndex--; render(); return; }
+  if(state.dimIndex>0){ state.dimIndex--; state.qIndex = activeQuestions(ALL_DIMS[state.dimIndex]).length-1; render(); }
+}
+
+function renderD4Controls(pct){
+  const controls = D4.q5controls;
+  let body = `<div class="dim-tag" style="--tagcolor:${D4.color}">Market Traction · Q5 authenticity review</div>
+  <h2>Do any of these four independent checks show a confirmed anomaly?</h2>
+  <p class="lead">Anomaly ≠ automatic penalty. Mark each as Cleared, Uncertain, or Confirmed. A confirmed tag applies one non-stacking penalty (F capped at 35, G × 0.5); two or more confirmed tags trigger manual review.</p>
+  <div class="options">`;
+  controls.forEach(c=>{
+    const cur = (state.q5controls||{})[c.id];
+    body += `<div class="evi-row" style="margin-bottom:10px;">
+      <div class="evi-q">${c.label}</div>
+      <div class="evi-doc">${c.desc}</div>
+      <div class="evi-choices" style="margin-top:10px;">
+        <div class="chip full ${cur==='cleared'?'active':''}" onclick="setQ5Control('${c.id}','cleared')">Cleared</div>
+        <div class="chip partial ${cur==='uncertain'?'active':''}" onclick="setQ5Control('${c.id}','uncertain')">Uncertain</div>
+        <div class="chip none ${cur==='confirmed'?'active':''}" onclick="setQ5Control('${c.id}','confirmed')">Confirmed</div>
+      </div>
+    </div>`;
+  });
+  body += `</div>`;
+  const allSet = controls.every(c=>(state.q5controls||{})[c.id]);
+  body += `<div class="btnrow">
+    <button class="nav" onclick="goBack()">← Back</button>
+    <button class="nav primary" onclick="finishD4Controls()" ${allSet?"":"disabled"}>Continue →</button>
+  </div>`;
+  return `<div class="progress-wrap"><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="progress-label"><span>D1–D5 guided interview</span><span>${pct}%</span></div></div>
+    <div class="card">${body}</div>`;
+}
+function setQ5Control(id, val){
+  if(!state.q5controls) state.q5controls={};
+  state.q5controls[id]=val; render();
+}
+function finishD4Controls(){
+  const confirmedCount = Object.values(state.q5controls||{}).filter(v=>v==="confirmed").length;
+  if(confirmedCount>=2){ state.screen="manualReview"; render(); return; }
+  if(state.dimIndex < ALL_DIMS.length-1){ state.dimIndex++; state.qIndex=0; state.screen="q"; render(); }
+  else { state.screen="evidence"; render(); }
+}
+
+function renderManualReview(){
+  const confirmed = Object.entries(state.q5controls||{}).filter(([k,v])=>v==="confirmed").map(([k])=>D4.q5controls.find(c=>c.id===k));
+  return `<div class="card">
+    <div class="dim-tag" style="--tagcolor:var(--warn)">Market Traction · Governance gate</div>
+    <div class="review-box">
+      <div class="spinner"></div>
+      <h2 style="text-align:center;">2+ confirmed anomalies → Mandatory High-Risk Manual Review</h2>
+      <p class="lead" style="text-align:center;">Every confirmed tag stays visible. In the live product a reviewer clears each evidence chain individually. For this demo, play the reviewer: decide the outcome for each flagged tag.</p>
+    </div>
+    <div class="options">
+      ${confirmed.map(c=>`
+        <div class="evi-row">
+          <div class="evi-q">${c.label}</div>
+          <div class="evi-doc">Reviewer decision after checking: ${c.evidence.toLowerCase()}</div>
+          <div class="evi-choices" style="margin-top:10px;">
+            <div class="chip full ${state.reviewOutcome && state.reviewOutcome[c.id]==='cleared'?'active':''}" onclick="setReviewOutcome('${c.id}','cleared')">Reviewer clears it</div>
+            <div class="chip none ${state.reviewOutcome && state.reviewOutcome[c.id]==='upheld'?'active':''}" onclick="setReviewOutcome('${c.id}','upheld')">Reviewer upholds penalty</div>
+          </div>
+        </div>`).join("")}
+    </div>
+    <div class="btnrow">
+      <button class="nav" onclick="state.screen='q';render()">← Back to Q5</button>
+      <button class="nav primary" onclick="finishManualReview()" ${confirmed.every(c=>state.reviewOutcome && state.reviewOutcome[c.id])?"":"disabled"}>Apply reviewer decision →</button>
+    </div>
+  </div>`;
+}
+function setReviewOutcome(id,val){
+  if(!state.reviewOutcome) state.reviewOutcome={};
+  state.reviewOutcome[id]=val; render();
+}
+function finishManualReview(){
+  // apply reviewer decisions: cleared -> flip control to 'cleared'
+  Object.entries(state.reviewOutcome||{}).forEach(([id,val])=>{
+    if(val==="cleared") state.q5controls[id]="cleared";
+  });
+  if(state.dimIndex < ALL_DIMS.length-1){ state.dimIndex++; state.qIndex=0; state.screen="q"; render(); }
+  else { state.screen="evidence"; render(); }
+}
+
+/* ---------------- Evidence (D6) screen ---------------- */
+function renderEvidence(){
+  const items = evidenceChecklist();
+  const pendingReselect = state.reselectOpenKey;
+  let body = `<div class="dim-tag" style="--tagcolor:var(--d6)">D6 · Documentation Completeness</div>
+  <h2>Final evidence stage</h2>
+  <p class="lead">D6 has no questions of its own. It compiles one checklist from every claim you just made and asks you to back it up. For D1/D2/D5, weak evidence discounts that question's score. For D3/D4, weak evidence sends you back to re-answer honestly against what you can prove.</p>`;
+
+  items.forEach(it=>{
+    const key = it.dimId+":"+it.qId;
+    const cur = (state.evidenceState[it.dimId]||{})[it.qId];
+    body += `<div class="evi-row" style="border-left:3px solid ${it.dimColor}">
+      <div class="evi-head">
+        <div>
+          <div class="evi-q">${it.dimName} — ${it.qId}</div>
+          <div class="evi-doc">${it.docText}</div>
+        </div>
+      </div>
+      <div class="evi-choices">
+        <div class="chip full ${cur==='full'?'active':''}" onclick="setEvidence('${it.dimId}','${it.qId}','full',${it.weighted})">Fully submitted</div>
+        <div class="chip partial ${cur==='partial'?'active':''}" onclick="setEvidence('${it.dimId}','${it.qId}','partial',${it.weighted})">Partially submitted</div>
+        <div class="chip none ${cur==='none'?'active':''}" onclick="setEvidence('${it.dimId}','${it.qId}','none',${it.weighted})">Not submitted</div>
+      </div>`;
+    if(it.weighted && (cur==="partial"||cur==="none")){
+      body += `<div class="reselect-box">
+        <div class="reselect-note">Evidence doesn't back up your original answer — please re-select honestly for this question:</div>
+        <div class="options">`;
+      it.question.options.forEach((opt,i)=>{
+        const selected = (state.answers[it.dimId]||{})[it.qId] && (state.answers[it.dimId][it.qId].label===opt.label);
+        body += `<div class="opt ${selected?'selected':''}" style="padding:10px 14px;" onclick="reselectAnswer('${it.dimId}','${it.qId}',${i})">
+          <div class="opt-label" style="font-size:13.5px;">${opt.label}</div>
+        </div>`;
+      });
+      body += `</div></div>`;
+    } else if(it.weighted && cur){
+      body += `<div class="resolved-badge">✓ Evidence matches answer — resolved</div>`;
+    }
+    body += `</div>`;
+  });
+
+  const allSet = items.every(it=>(state.evidenceState[it.dimId]||{})[it.qId]);
+  body += `<div class="btnrow">
+    <button class="nav" onclick="state.screen='q';state.dimIndex=4;state.qIndex=activeQuestions(D5).length-1;render()">← Back to questions</button>
+    <button class="nav primary" onclick="state.screen='results';render()" ${allSet?"":"disabled"}>See my results →</button>
+  </div>`;
+
+  return `<div class="card">${body}</div>`;
+}
+function setEvidence(dimId,qId,val,weighted){
+  if(!state.evidenceState[dimId]) state.evidenceState[dimId]={};
+  state.evidenceState[dimId][qId]=val;
+  render();
+}
+function reselectAnswer(dimId,qId,i){
+  const dim = ALL_DIMS.find(d=>d.id===dimId);
+  const opt = dim.questions.find(q=>q.id===qId).options[i];
+  state.answers[dimId][qId]=opt;
+  // mark as resolved/full now that answer matches provided evidence
+  state.evidenceState[dimId][qId]="full";
+  render();
+}
+
+/* ---------------- Results ---------------- */
+function renderResults(){
+  const results = allDimResults();
+  const overall = overallBand(results);
+  const improve = improvementList(results);
+  const bandInfo = BAND_LABELS_STANDARD[overall.final];
+
+  let html = `<div class="card">
+    <div class="dash-overall">
+      <div style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;">Overall Readiness</div>
+      <div class="band-pill band-${overall.final}" style="margin-top:10px;">${bandInfo.name}</div>
+      <div class="overall-sub">${bandInfo.action}</div>
+    </div>
+
+    <div class="grid6">
+      ${ALL_DIMS.map(d=>{
+        const r = results[d.id];
+        const label = d.labelSet[r.band];
+        return `<div class="dcard" style="border-color:${d.color}55">
+          <div class="dname" style="color:${d.color}">${d.id}</div>
+          <div class="dband">${label.name}</div>
+          <div class="dbar"><div style="width:${r.pct}%;background:${d.color}"></div></div>
+        </div>`;
+      }).join("")}
+      <div class="dcard" style="border-color:var(--d6)55">
+        <div class="dname" style="color:var(--d6)">D6</div>
+        <div class="dband">Evidence reviewed</div>
+        <div class="dbar"><div style="width:100%;background:var(--d6)"></div></div>
+      </div>
+    </div>
+
+    <div class="tier-title">Critical — resolve first (${improve.critical.length})</div>
+    ${improve.critical.length? improve.critical.map(it=>`
+      <div class="improve-item critical">
+        <span class="ii-tag" style="color:${it.color}">${it.dim}</span>
+        <div class="ii-issue">[ ! ] ${it.issue}</div>
+        <div class="ii-fix">${it.fix}</div>
+      </div>`).join("") : `<p class="lead">No critical defects triggered — nice.</p>`}
+
+    <div class="tier-title">Recommended (${improve.recommended.length})</div>
+    ${improve.recommended.length? improve.recommended.map(it=>`
+      <div class="improve-item recommended">
+        <span class="ii-tag" style="color:${it.color}">${it.dim}</span>
+        <div class="ii-issue">${it.issue}</div>
+        <div class="ii-fix">${it.fix}</div>
+      </div>`).join("") : `<p class="lead">Nothing further recommended.</p>`}
+
+    ${state.debug ? renderDebug(results, overall) : ""}
+
+    <div class="btnrow" style="margin-top:24px;">
+      <button class="nav ghost" onclick="restart()">↺ Restart demo</button>
+    </div>
+  </div>`;
+  return html;
+}
+
+function renderDebug(results, overall){
+  let lines = "";
+  ALL_DIMS.forEach(d=>{
+    const r = results[d.id];
+    lines += `${d.id} (${d.name})\n`;
+    if(d.weighted){
+      if(d.id==="D3"){
+        lines += `  A=${r.A.toFixed(1)}  B=${r.B.toFixed(1)}  C_adj=${r.C.toFixed(1)}  D_final=${r.D.toFixed(1)}\n`;
+        lines += `  pre-cap = (A×0.44 + C×0.56)×0.45 + B×0.35 + D×0.20 = ${r.pct}\n`;
+        lines += `  cap39 triggered: ${r.cap39?"YES":"no"}   cap59 triggered: ${r.cap59?"YES":"no"}\n`;
+      } else {
+        lines += `  F=${r.F.toFixed(1)}  G=${r.G.toFixed(1)}  H=${r.H.toFixed(1)}  I=${r.I.toFixed(1)}  confirmed anomalies=${r.confirmedCount}\n`;
+        lines += `  score = F×0.30 + G×0.25 + H×0.25 + I×0.20 = ${r.pct}\n`;
+      }
+    } else {
+      lines += `  score = round(earned ${r.earned.toFixed(1)} / max ${d.maxPoints} × 100) = ${r.pct}%   hard-blocker cap: ${r.cap<5?"Band "+r.cap:"none"}\n`;
+    }
+    lines += `  → mapped band index: ${r.band} (${d.labelSet[r.band].name})\n\n`;
+  });
+  lines += `Mean band index = (${ALL_DIMS.map(d=>results[d.id].band).join(" + ")}) / 5 = ${overall.mean.toFixed(2)}\n`;
+  lines += `Preliminary overall band (rounded, .5 rounds up) = ${overall.prelim}\n`;
+  lines += `Lowest dimension band = ${overall.lowest}  →  weakest-link cap = ${overall.lowest}+1 = ${overall.lowest+1}\n`;
+  lines += `Final overall band = min(${overall.prelim}, ${overall.lowest+1}) = ${overall.final}`;
+  return `<div class="debug-panel"><h4>Sponsor view — internal calculation</h4><pre>${lines}</pre></div>`;
+}
+
+function restart(){
+  state = {screen:"intro", dimIndex:0, qIndex:0, answers:{}, history:[], evidenceState:{}, q5controls:{}, debug:state.debug, reselectOpenKey:null};
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IP Investment Readiness Tool — Automated Test Suite</title>
+<style>
+  :root{
+    --bg:#0f1424; --panel:#161d34; --panel2:#1d2545; --text:#eef1fb; --muted:#9aa4c7;
+    --accent:#6d8dff; --good:#3ecf8e; --bad:#ef5b5b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:radial-gradient(1200px 800px at 20% -10%, #24305e 0%, var(--bg) 55%) fixed;
+    color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  #app{max-width:920px;margin:0 auto;padding:28px 20px 80px;}
+  h1{font-size:24px;margin:0 0 6px;}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px;}
+  .summary{display:flex;gap:14px;margin-bottom:24px;flex-wrap:wrap;}
+  .stat{background:var(--panel2);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 22px;flex:1;min-width:140px;}
+  .stat b{display:block;font-size:26px;}
+  .stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .stat.pass b{color:var(--good);}
+  .stat.fail b{color:var(--bad);}
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:.5px;font-weight:800;color:var(--muted);
+    margin:26px 0 10px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.08);}
+  .tc{border-radius:12px;padding:13px 16px;margin-bottom:8px;border:1px solid rgba(255,255,255,.08);background:var(--panel);
+    display:flex;gap:12px;align-items:flex-start;}
+  .tc.pass{border-left:4px solid var(--good);}
+  .tc.fail{border-left:4px solid var(--bad);background:rgba(239,91,91,.07);}
+  .tc .icon{font-weight:800;font-size:15px;flex:none;width:20px;}
+  .tc.pass .icon{color:var(--good);}
+  .tc.fail .icon{color:var(--bad);}
+  .tc .name{font-size:14px;font-weight:600;}
+  .tc .detail{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.5;}
+  .tc .err{font-size:12.5px;color:#ff9a9a;margin-top:5px;font-family:ui-monospace,Menlo,Consolas,monospace;}
+</style>
+</head>
+<body>
+<div id="app">Running tests…</div>
+<script>
+/* =========================================================================
+   ENGINE UNDER TEST — copied verbatim from IP_Readiness_Demo.html
+   (data model + scoring/aggregation functions only; no rendering code).
+   Keep this block in sync with the demo file if the demo's engine changes.
+========================================================================= */
+const BAND_LABELS_STANDARD = [null,
+  {name:"Not ready",action:"Stop diligence on this asset now."},
+  {name:"Starting",action:"Too early for a live deal; route to remediation."},
+  {name:"Developing",action:"Do not fund on standard terms; requires escrow or staged tranches."},
+  {name:"Near-ready",action:"Fundable with a defined closing checklist."},
+  {name:"Ready",action:"Proceed to term sheet; no remediation needed."}];
+const BAND_LABELS_INVESTMENT = [null,
+  {name:"Do Not Invest",action:"Stop diligence on this asset now."},
+  {name:"Pre-Investment / Incubation",action:"Too early for a live deal; route to remediation track."},
+  {name:"Structured Deal Only",action:"Do not fund on standard terms; requires escrow, staged tranches, or indemnity holdback."},
+  {name:"Conditional Approval",action:"Fundable with a defined closing checklist; no deal-structure change needed."},
+  {name:"Investment-Grade",action:"Proceed to term sheet; no remediation needed."}];
+function bandFromPercent(pct, thresholds){ for(const t of thresholds){ if(pct <= t.max) return t.idx; } return thresholds[thresholds.length-1].idx; }
+const EVEN_BANDS = [{max:19,idx:1},{max:39,idx:2},{max:59,idx:3},{max:79,idx:4},{max:100,idx:5}];
+const D3D4_BANDS = [{max:39,idx:1},{max:59,idx:2},{max:74,idx:3},{max:89,idx:4},{max:100,idx:5}];
+
+const D1 = {id:"D1",name:"Title & Ownership Clarity",maxPoints:50,labelSet:BAND_LABELS_INVESTMENT,bandThresholds:EVEN_BANDS,
+  questions:[
+    {id:"Q1",text:"How did you agree on ownership with your main team?",evidence:"doc",options:[
+      {label:"Full written agreements",pts:15},{label:"Some missing/unclear",pts:5,improve:"x"},{label:"Verbal/Chats only",pts:0,cap:1,improve:"x"}]},
+    {id:"Q2",text:"Did the rest of your crew sign contracts?",evidence:"doc",options:[
+      {label:"Yes, 100%",pts:10},{label:"Most signed",pts:5,improve:"x"},{label:"No",pts:0,cap:3,improve:"x"}]},
+    {id:"Q3",text:"Do you have co-creators?",evidence:null,options:[
+      {label:"Yes — I have co-creators",pts:0,jump:"Q4"},{label:"No — I am the sole creator",pts:10,jump:"Q5"}]},
+    {id:"Q4",text:"Do you have a signed delegation agreement?",requiresJumpFrom:"Q3:Yes — I have co-creators",evidence:"doc",options:[
+      {label:"One specific entity",pts:10},{label:"Unclear agreement",pts:5,improve:"x"},{label:"No agreement",pts:0,cap:2,improve:"x"}]},
+    {id:"Q5",text:"Did creators agree to let you edit/remix?",evidence:"doc",options:[
+      {label:"Explicit written waivers",pts:10},{label:"Rights bought, no explicit waiver",pts:5,improve:"x"},{label:"No",pts:0,cap:1,improve:"x"}]},
+    {id:"Q6",text:"Do you own derivative rights?",evidence:"doc",options:[
+      {label:"Yes, unconditional global rights",pts:5},{label:"Some rights (split IP)",pts:2,improve:"x"},{label:"No, single work only",pts:0,improve:"x"}]}
+  ]};
+const D2 = {id:"D2",name:"Licensability",maxPoints:70,labelSet:BAND_LABELS_INVESTMENT,bandThresholds:EVEN_BANDS,
+  questions:[
+    {id:"Q1",text:"Signed away exclusive rights before?",evidence:"doc",options:[
+      {label:"No",pts:15},{label:"Minor regional deals",pts:5,improve:"x"},{label:"Yes, long-term global rights",pts:0,cap:1,improve:"x"}]},
+    {id:"Q2",text:"Used as loan collateral?",evidence:"doc",options:[
+      {label:"No",pts:15},{label:"Loan paid, registry not updated",pts:5,improve:"x"},{label:"Yes",pts:0,cap:3,improve:"x"}]},
+    {id:"Q3",text:"Retain 100% revenue?",evidence:"doc",options:[
+      {label:"We retain 100% of the revenue",pts:20,jump:"Q5"},{label:"We are obligated to split revenue",pts:0,improve:"x",jump:"Q4"}]},
+    {id:"Q4",text:"How is division formalised?",requiresJumpFrom:"Q3:We are obligated to split revenue",evidence:"doc",options:[
+      {label:"Signed Split Sheets",pts:15},{label:"Verbal agreements",pts:10,improve:"x"},{label:"Figure it out later",pts:0,improve:"x"}]},
+    {id:"Q5",text:"Rights transferable?",evidence:"doc",options:[
+      {label:"Yes, explicitly transferable",pts:10},{label:"Unclear",pts:5,improve:"x"},{label:"No, tied to creator",pts:0,cap:2,improve:"x"}]},
+    {id:"Q6",text:"Documented licensing history?",evidence:"doc",options:[
+      {label:"Documented history",pts:10},{label:"Informal past deals",pts:5,improve:"x"},{label:"No history",pts:0,improve:"x"}]}
+  ]};
+const D5 = {id:"D5",name:"Risk & Infringement Exposure",maxPoints:10,labelSet:BAND_LABELS_STANDARD,bandThresholds:EVEN_BANDS,
+  questions:[
+    {id:"Q1",text:"AI scraping protected?",evidence:"doc",options:[
+      {label:"Yes — strict technical blockers",pts:2},{label:"Partial TOS only",pts:1},
+      {label:"Not sure or haven't assessed",pts:0,cap:3,improve:"x"},{label:"No — publicly hosted",pts:0,cap:2,improve:"x"}]},
+    {id:"Q2",text:"Piracy protection?",evidence:"doc",options:[
+      {label:"Comprehensive DRM",pts:2},{label:"Basic protection",pts:1},
+      {label:"Passive response only",pts:0,cap:3,improve:"x"},{label:"No protection",pts:0,cap:2,improve:"x"}]},
+    {id:"Q3",text:"OSS Copyleft audited?",evidence:"doc",options:[
+      {label:"N/A or permissive",pts:2},{label:"OSS used but unaudited",pts:1,cap:4,improve:"x"},
+      {label:"Copyleft integrated",pts:0,cap:2,improve:"x"},{label:"Facing forced disclosure",pts:0,cap:1,improve:"x"}]},
+    {id:"Q4",text:"Music clearance obtained?",evidence:"doc",options:[
+      {label:"N/A or 100% original",pts:2},{label:"Yes — dual rights cleared",pts:2},
+      {label:"Pending festival only",pts:1,cap:3,improve:"x"},{label:"Only one right/oral",pts:0,cap:2,improve:"x"},{label:"No formal clearance",pts:0,cap:1,improve:"x"}]},
+    {id:"Q5",text:"Pending disputes?",evidence:"doc",options:[
+      {label:"No disputes",pts:2},{label:"Historical settled",pts:2},
+      {label:"Systemic macro disputes",pts:1,cap:4,improve:"x"},{label:"Minor dispute under appeal",pts:0,cap:3,improve:"x"},{label:"Active major litigation",pts:0,cap:1,improve:"x"}]}
+  ]};
+const D3 = {id:"D3",name:"Revenue Track Record",weighted:true,labelSet:BAND_LABELS_STANDARD,bandThresholds:D3D4_BANDS,
+  questions:[
+    {id:"Q1",varName:"A",text:"How long has this IP generated income?",evidence:"doc",options:[
+      {label:"No record, or under 6 months",value:0},{label:"6–11 months of income",value:50},{label:"12–23 months of income",value:75},{label:"24+ months, no gap over 3 months",value:100}]},
+    {id:"Q2",varName:"B",text:"What evidence proves the income?",evidence:"doc",options:[
+      {label:"No evidence at all",value:0,flag:"noEvidence"},{label:"Self-made records only",value:25},
+      {label:"Standalone CMO or manager statement only",value:25,flag:"auditFlag"},{label:"Statement plus matching proof",value:50},
+      {label:"Direct platform dashboard, or CMO + bank proof",value:75},{label:"Multiple matching documents",value:100},
+      {label:"Documents conflict with each other",value:0,flag:"mismatch"}]},
+    {id:"Q3",varName:"C",text:"How repeatable is the income pattern?",evidence:"doc",options:[
+      {label:"Irregular",value:0},{label:"Seasonal or volatile",value:50},{label:"Verified-explained drop",value:75},{label:"Quarterly and mostly steady",value:100}]},
+    {id:"Q4",varName:"D",text:"Where did income come from?",evidence:"doc",options:[
+      {label:"No source, or one source only",value:0},{label:"Two sources, one dominant",value:50},{label:"Two balanced sources",value:75},{label:"Three or more balanced sources",value:100}],
+      followupCheckbox:{label:"single-work dependency"}},
+    {id:"Q5",varName:null,text:"Are revenue rights restricted?",evidence:"doc",options:[
+      {label:"No — rights are fully clear",value:0},{label:"Not sure",value:0,cap59:true},{label:"Yes — advance not fully recouped",value:0,cap59:true},
+      {label:"Yes — future income pledged",value:0,cap59:true},{label:"Yes — no signed co-owner agreement",value:0,cap59:true}]}
+  ]};
+const D4 = {id:"D4",name:"Market Traction",weighted:true,labelSet:BAND_LABELS_STANDARD,bandThresholds:D3D4_BANDS,
+  questions:[
+    {id:"Q1",varName:"F",text:"What official audience proof exists?",evidence:"doc",options:[
+      {label:"No official proof",value:0},{label:"Social-media metrics only",value:35},{label:"Official platform data, below threshold",value:50},
+      {label:"Official traction above threshold",value:70},{label:"Strong platform numbers plus recognition",value:100}]},
+    {id:"Q2",varName:"G",text:"Does demand persist?",evidence:"doc",options:[
+      {label:"Too new or dropped",value:0},{label:"One recent work",value:50},{label:"Stable small catalogue",value:75},{label:"Growing/older still active",value:100}]},
+    {id:"Q3",varName:"H",text:"Where is the audience?",evidence:"doc",options:[
+      {label:"No location data",value:0},{label:"Mostly domestic",value:50},{label:"15–30% overseas",value:75},{label:"Over 30% overseas w/ income records",value:100}]},
+    {id:"Q4",varName:"I",text:"Traction crossed into paid demand?",evidence:"doc",options:[
+      {label:"No monetisation",value:0},{label:"Outreach intent only",value:50},{label:"One completed deal",value:75},{label:"Two or more completed deals",value:100}]}
+  ],
+  q5controls:[{id:"Q5A",label:"Cross-Metric Mismatch",evidence:"doc"},{id:"Q5B",label:"Geographic Concentration",evidence:"doc"},
+    {id:"Q5C",label:"Playlist Concentration",evidence:"doc"},{id:"Q5D",label:"Traffic Spike",evidence:"doc"}]};
+const ALL_DIMS = [D1,D2,D3,D4,D5];
+
+let state = { answers:{}, evidenceState:{}, q5controls:{}, q3singleWork:false };
+
+function activeQuestions(dim){
+  const seq = []; const byId = {}; dim.questions.forEach(q=>byId[q.id]=q);
+  let cur = dim.questions[0].id; const visited = new Set();
+  while(cur && byId[cur] && !visited.has(cur)){
+    visited.add(cur); seq.push(byId[cur]);
+    const ans = state.answers[dim.id] && state.answers[dim.id][cur];
+    if(ans && ans.jump){ cur = ans.jump; }
+    else {
+      const i = dim.questions.findIndex(q=>q.id===cur);
+      cur = dim.questions[i+1] ? dim.questions[i+1].id : null;
+      while(cur && byId[cur] && byId[cur].requiresJumpFrom){
+        const [reqQ, reqLabel] = byId[cur].requiresJumpFrom.split(":");
+        const reqAns = state.answers[dim.id] && state.answers[dim.id][reqQ];
+        if(reqAns && reqAns.label === reqLabel) break;
+        const i2 = dim.questions.findIndex(q=>q.id===cur);
+        cur = dim.questions[i2+1] ? dim.questions[i2+1].id : null;
+      }
+    }
+  }
+  return seq;
+}
+function evidenceDiscount(dimId, qId, pts){
+  const st = (state.evidenceState[dimId]||{})[qId];
+  if(st === "partial") return pts*0.6;
+  if(st === "none") return pts*0.2;
+  return pts;
+}
+function computeD1D2D5(dim){
+  const qs = activeQuestions(dim);
+  let earned = 0, cap = 5; const rows = [];
+  qs.forEach(q=>{
+    const ans = (state.answers[dim.id]||{})[q.id]; if(!ans) return;
+    let pts = ans.pts||0; const discounted = evidenceDiscount(dim.id, q.id, pts);
+    earned += discounted; if(ans.cap) cap = Math.min(cap, ans.cap);
+    rows.push({q:q.id, chosen:ans.label, pts, discounted, cap:ans.cap||null});
+  });
+  const pct = Math.round((earned/dim.maxPoints)*100);
+  let band = bandFromPercent(Math.max(0,Math.min(100,pct)), dim.bandThresholds);
+  band = Math.min(band, cap);
+  return {pct, band, cap, rows, earned};
+}
+function getVal(dim,qId){ const ans = (state.answers[dim.id]||{})[qId]; return ans ? ans.value : 0; }
+function discountedVar(dimId,qId,val){
+  const st = (state.evidenceState[dimId]||{})[qId];
+  if(st==="partial") return val*0.6; if(st==="none") return val*0.2; return val;
+}
+function computeD3(){
+  const A = getVal(D3,"Q1"), Braw = getVal(D3,"Q2"), Craw = getVal(D3,"Q3"), Draw = getVal(D3,"Q4");
+  const q2ans = (state.answers.D3||{}).Q2; const q5ans = (state.answers.D3||{}).Q5;
+  const singleWork = state.q3singleWork;
+  const bFullyDiscounted = discountedVar("D3","Q2",Braw);
+  const cAdj = bFullyDiscounted<=50 ? Craw*0.5 : discountedVar("D3","Q3",Craw);
+  let dFinal = discountedVar("D3","Q4",Draw);
+  if(singleWork) dFinal = Math.min(dFinal,50);
+  const preCap = (A*0.44 + cAdj*0.56)*0.45 + bFullyDiscounted*0.35 + dFinal*0.20;
+  let cap39 = q2ans && (q2ans.flag==="noEvidence"||q2ans.flag==="mismatch");
+  let cap59 = q5ans && q5ans.cap59;
+  let final = preCap;
+  if(cap39) final = Math.min(final,39);
+  if(cap59) final = Math.min(final,59);
+  final = Math.round(final);
+  const band = bandFromPercent(Math.max(0,Math.min(100,final)), D3D4_BANDS);
+  return {pct:final, band, cap39, cap59, A, B:bFullyDiscounted, C:cAdj, D:dFinal};
+}
+function computeD4(){
+  const F0 = getVal(D4,"Q1"), G0 = getVal(D4,"Q2"), H0 = discountedVar("D4","Q3",getVal(D4,"Q3")), I0 = discountedVar("D4","Q4",getVal(D4,"Q4"));
+  const controls = state.q5controls||{};
+  const confirmedCount = Object.values(controls).filter(v=>v==="confirmed").length;
+  let F = discountedVar("D4","Q1",F0), G = discountedVar("D4","Q2",G0);
+  if(confirmedCount>=1){ F = Math.min(F,35); G = G*0.5; }
+  const finalScore = Math.round(F*0.30 + G*0.25 + H0*0.25 + I0*0.20);
+  const band = bandFromPercent(Math.max(0,Math.min(100,finalScore)), D3D4_BANDS);
+  return {pct:finalScore, band, confirmedCount, F, G, H:H0, I:I0};
+}
+function computeDimResult(dim){ if(dim.weighted) return dim.id==="D3" ? computeD3() : computeD4(); return computeD1D2D5(dim); }
+function allDimResults(){ const out = {}; ALL_DIMS.forEach(d=> out[d.id]=computeDimResult(d)); return out; }
+function overallBand(results){
+  const bands = ALL_DIMS.map(d=>results[d.id].band);
+  const mean = bands.reduce((a,b)=>a+b,0)/5;
+  let prelim = Math.round(mean + 1e-9);
+  if((mean*2)%2===1) prelim = Math.ceil(mean);
+  const lowest = Math.min(...bands);
+  const final = Math.min(prelim, lowest+1);
+  return {mean, prelim, lowest, final};
+}
+function improvementList(results){
+  const critical = [], recommended = [];
+  ALL_DIMS.forEach(dim=>{
+    if(dim.weighted) return;
+    const qs = activeQuestions(dim).filter(q=>q.options.every(o=>o.pts!==undefined));
+    qs.forEach(q=>{
+      const ans = (state.answers[dim.id]||{})[q.id]; if(!ans || !ans.improve) return;
+      const evi = (state.evidenceState[dim.id]||{})[q.id];
+      const isCapped = !!ans.cap; const isDiscounted = evi==="partial"||evi==="none";
+      const item = {dim:dim.name, issue: ans.label};
+      if(isCapped || isDiscounted) critical.push(item); else recommended.push(item);
+    });
+  });
+  const q5D3 = (state.answers.D3||{}).Q5;
+  if(q5D3 && q5D3.cap59) critical.push({dim:"D3", issue:q5D3.label});
+  const q2D3 = (state.answers.D3||{}).Q2;
+  if(q2D3 && (q2D3.flag==="noEvidence"||q2D3.flag==="mismatch")) critical.push({dim:"D3", issue:q2D3.label});
+  else if(q2D3 && q2D3.flag==="auditFlag") recommended.push({dim:"D3", issue:q2D3.label});
+  Object.entries(state.q5controls||{}).filter(([k,v])=>v==="confirmed").forEach(([k])=>critical.push({dim:"D4", issue:k}));
+  return {critical, recommended};
+}
+
+/* =========================================================================
+   TEST HARNESS
+========================================================================= */
+const results = [];
+function resetState(){ state = { answers:{}, evidenceState:{}, q5controls:{}, q3singleWork:false }; }
+function pick(dimId, qId, label){
+  const dim = ALL_DIMS.find(d=>d.id===dimId);
+  const opt = dim.questions.find(q=>q.id===qId).options.find(o=>o.label===label);
+  if(!opt) throw new Error("Option not found: "+dimId+"/"+qId+"/"+label);
+  if(!state.answers[dimId]) state.answers[dimId] = {};
+  state.answers[dimId][qId] = opt;
+}
+function fullEvidence(dimId, qId){ if(!state.evidenceState[dimId]) state.evidenceState[dimId]={}; state.evidenceState[dimId][qId]="full"; }
+function fullEvidenceAll(){ ALL_DIMS.forEach(dim=>activeQuestions(dim).forEach(q=>{ if(q.evidence) fullEvidence(dim.id,q.id); })); }
+function eq(actual, expected, label){ if(actual!==expected) throw new Error((label||"value")+": expected "+JSON.stringify(expected)+" but got "+JSON.stringify(actual)); }
+function close(actual, expected, tol, label){ if(Math.abs(actual-expected)>tol) throw new Error((label||"value")+": expected ~"+expected+" but got "+actual); }
+
+function test(section, name, fn){
+  try{ fn(); results.push({section, name, pass:true}); }
+  catch(e){ results.push({section, name, pass:false, error: e.message}); }
+}
+
+/* ---- Section: D1/D2/D5 additive scoring ---- */
+test("D1/D2/D5 scoring","D1 best case (solo creator path) scores 100% / Band 5", ()=>{
+  resetState();
+  pick("D1","Q1","Full written agreements"); pick("D1","Q2","Yes, 100%"); pick("D1","Q3","No — I am the sole creator");
+  pick("D1","Q5","Explicit written waivers"); pick("D1","Q6","Yes, unconditional global rights");
+  fullEvidenceAll();
+  const r = computeD1D2D5(D1);
+  eq(r.pct, 100, "D1 pct"); eq(r.band, 5, "D1 band");
+});
+test("D1/D2/D5 scoring","D1 best case (co-creator path, Q4 included) also scores 100%", ()=>{
+  resetState();
+  pick("D1","Q1","Full written agreements"); pick("D1","Q2","Yes, 100%"); pick("D1","Q3","Yes — I have co-creators");
+  pick("D1","Q4","One specific entity"); pick("D1","Q5","Explicit written waivers"); pick("D1","Q6","Yes, unconditional global rights");
+  fullEvidenceAll();
+  const r = computeD1D2D5(D1);
+  eq(r.pct, 100, "D1 pct");
+});
+test("D1/D2/D5 scoring","D1 worst case scores 0% and hard-blocker caps Band to 1", ()=>{
+  resetState();
+  pick("D1","Q1","Verbal/Chats only"); pick("D1","Q2","No"); pick("D1","Q3","Yes — I have co-creators");
+  pick("D1","Q4","No agreement"); pick("D1","Q5","No"); pick("D1","Q6","No, single work only");
+  fullEvidenceAll();
+  const r = computeD1D2D5(D1);
+  eq(r.pct, 0, "D1 pct"); eq(r.cap, 1, "D1 cap"); eq(r.band, 1, "D1 band");
+});
+test("D1/D2/D5 scoring","D1 Q1 hard-blocker (cap 1) overrides an otherwise-high score", ()=>{
+  resetState();
+  pick("D1","Q1","Verbal/Chats only"); pick("D1","Q2","Yes, 100%"); pick("D1","Q3","No — I am the sole creator");
+  pick("D1","Q5","Explicit written waivers"); pick("D1","Q6","Yes, unconditional global rights");
+  fullEvidenceAll();
+  const r = computeD1D2D5(D1);
+  eq(r.band, 1, "D1 band forced to 1 despite pct="+r.pct);
+});
+test("D1/D2/D5 scoring","D2 best case (retain 100%, Q4 skipped) scores 100%", ()=>{
+  resetState();
+  pick("D2","Q1","No"); pick("D2","Q2","No"); pick("D2","Q3","We retain 100% of the revenue");
+  pick("D2","Q5","Yes, explicitly transferable"); pick("D2","Q6","Documented history");
+  fullEvidenceAll();
+  eq(computeD1D2D5(D2).pct, 100, "D2 pct");
+});
+test("D1/D2/D5 scoring","D5 (max 10 points) best case scores 100%", ()=>{
+  resetState();
+  pick("D5","Q1","Yes — strict technical blockers"); pick("D5","Q2","Comprehensive DRM");
+  pick("D5","Q3","N/A or permissive"); pick("D5","Q4","Yes — dual rights cleared"); pick("D5","Q5","No disputes");
+  fullEvidenceAll();
+  eq(computeD1D2D5(D5).pct, 100, "D5 pct");
+});
+
+/* ---- Section: branch / skip logic ---- */
+test("Branch logic","D1: co-creator=No skips Q4", ()=>{
+  resetState(); pick("D1","Q3","No — I am the sole creator");
+  eq(activeQuestions(D1).map(q=>q.id).join(","), "Q1,Q2,Q3,Q5,Q6", "sequence");
+});
+test("Branch logic","D1: co-creator=Yes includes Q4", ()=>{
+  resetState(); pick("D1","Q3","Yes — I have co-creators");
+  eq(activeQuestions(D1).map(q=>q.id).join(","), "Q1,Q2,Q3,Q4,Q5,Q6", "sequence");
+});
+test("Branch logic","D2: retain 100% skips Q4", ()=>{
+  resetState(); pick("D2","Q3","We retain 100% of the revenue");
+  eq(activeQuestions(D2).map(q=>q.id).join(","), "Q1,Q2,Q3,Q5,Q6", "sequence");
+});
+test("Branch logic","D2: revenue split includes Q4", ()=>{
+  resetState(); pick("D2","Q3","We are obligated to split revenue");
+  eq(activeQuestions(D2).map(q=>q.id).join(","), "Q1,Q2,Q3,Q4,Q5,Q6", "sequence");
+});
+
+/* ---- Section: D6 evidence discount (p*(1-d)) ---- */
+test("D6 evidence discount","Partially submitted applies the documented 40% discount", ()=>{
+  resetState();
+  pick("D1","Q1","Full written agreements"); pick("D1","Q2","Yes, 100%"); pick("D1","Q3","No — I am the sole creator");
+  pick("D1","Q5","Explicit written waivers"); pick("D1","Q6","Yes, unconditional global rights");
+  fullEvidenceAll(); state.evidenceState.D1.Q1 = "partial"; // Q1 worth 15 -> 15*0.6=9
+  const r = computeD1D2D5(D1);
+  eq(Math.round((9+10+10+10+5)/50*100), r.pct, "D1 pct with Q1 partial");
+});
+test("D6 evidence discount","Not submitted applies the documented 80% discount", ()=>{
+  resetState();
+  pick("D1","Q1","Full written agreements"); pick("D1","Q2","Yes, 100%"); pick("D1","Q3","No — I am the sole creator");
+  pick("D1","Q5","Explicit written waivers"); pick("D1","Q6","Yes, unconditional global rights");
+  fullEvidenceAll(); state.evidenceState.D1.Q1 = "none"; // 15*0.2=3
+  const r = computeD1D2D5(D1);
+  eq(Math.round((3+10+10+10+5)/50*100), r.pct, "D1 pct with Q1 not-submitted");
+});
+
+/* ---- Section: D3 weighted engine ---- */
+test("D3 weighted engine","All-max answers, no caps → 100", ()=>{
+  resetState();
+  pick("D3","Q1","24+ months, no gap over 3 months"); pick("D3","Q2","Multiple matching documents");
+  pick("D3","Q3","Quarterly and mostly steady"); pick("D3","Q4","Three or more balanced sources"); pick("D3","Q5","No — rights are fully clear");
+  const r = computeD3();
+  eq(r.pct, 100, "D3 pct");
+});
+test("D3 weighted engine","Weak B (≤50) halves the C variable", ()=>{
+  resetState();
+  pick("D3","Q1","No record, or under 6 months"); pick("D3","Q2","Self-made records only"); // B=25 <=50
+  pick("D3","Q3","Quarterly and mostly steady"); // C_raw=100, should be halved to 50 because B<=50
+  pick("D3","Q4","No source, or one source only"); pick("D3","Q5","No — rights are fully clear");
+  const r = computeD3();
+  eq(r.C, 50, "C after halving (B="+r.B+" ≤ 50)");
+});
+test("D3 weighted engine","'No evidence' on Q2 triggers Cap 39, wins over a high pre-cap score", ()=>{
+  resetState();
+  pick("D3","Q1","24+ months, no gap over 3 months"); pick("D3","Q2","No evidence at all");
+  pick("D3","Q3","Quarterly and mostly steady"); pick("D3","Q4","Three or more balanced sources"); pick("D3","Q5","No — rights are fully clear");
+  const r = computeD3();
+  eq(r.cap39, true, "cap39 flag"); eq(r.pct<=39, true, "score capped at 39, got "+r.pct); eq(r.band, 1, "band forced to Not ready");
+});
+test("D3 weighted engine","Unrecouped advance on Q5 triggers Cap 59", ()=>{
+  resetState();
+  pick("D3","Q1","24+ months, no gap over 3 months"); pick("D3","Q2","Multiple matching documents");
+  pick("D3","Q3","Quarterly and mostly steady"); pick("D3","Q4","Three or more balanced sources"); pick("D3","Q5","Yes — advance not fully recouped");
+  const r = computeD3();
+  eq(r.cap59, true, "cap59 flag"); eq(r.pct<=59, true, "score capped at 59, got "+r.pct);
+});
+test("D3 weighted engine","When both Cap 39 and Cap 59 trigger, the lower cap (39) wins", ()=>{
+  resetState();
+  pick("D3","Q1","24+ months, no gap over 3 months"); pick("D3","Q2","No evidence at all");
+  pick("D3","Q3","Quarterly and mostly steady"); pick("D3","Q4","Three or more balanced sources"); pick("D3","Q5","Yes — advance not fully recouped");
+  const r = computeD3();
+  eq(r.pct <= 39, true, "lowest cap wins, got "+r.pct);
+});
+test("D3 weighted engine","Single-work-dependency checkbox caps D_final at 50", ()=>{
+  resetState();
+  pick("D3","Q1","24+ months, no gap over 3 months"); pick("D3","Q2","Multiple matching documents");
+  pick("D3","Q3","Quarterly and mostly steady"); pick("D3","Q4","Three or more balanced sources"); pick("D3","Q5","No — rights are fully clear");
+  state.q3singleWork = true;
+  const r = computeD3();
+  eq(r.D, 50, "D_final capped at 50");
+  close(r.pct, 90, 0.6, "expected (100*0.44+100*0.56)*0.45 + 100*0.35 + 50*0.20 = 90");
+});
+
+/* ---- Section: D4 weighted engine ---- */
+test("D4 weighted engine","All-max answers, all controls cleared → 100", ()=>{
+  resetState();
+  pick("D4","Q1","Strong platform numbers plus recognition"); pick("D4","Q2","Growing/older still active");
+  pick("D4","Q3","Over 30% overseas w/ income records"); pick("D4","Q4","Two or more completed deals");
+  state.q5controls = {Q5A:"cleared",Q5B:"cleared",Q5C:"cleared",Q5D:"cleared"};
+  eq(computeD4().pct, 100, "D4 pct");
+});
+test("D4 weighted engine","One confirmed anomaly applies F-cap(35) + G×0.5", ()=>{
+  resetState();
+  pick("D4","Q1","Strong platform numbers plus recognition"); pick("D4","Q2","Growing/older still active");
+  pick("D4","Q3","Over 30% overseas w/ income records"); pick("D4","Q4","Two or more completed deals");
+  state.q5controls = {Q5A:"confirmed",Q5B:"cleared",Q5C:"cleared",Q5D:"cleared"};
+  const r = computeD4();
+  eq(r.F, 35, "F capped at 35"); eq(r.G, 50, "G halved to 50");
+  close(r.pct, 68, 0.6, "35*.3+50*.25+100*.25+100*.2=68");
+});
+test("D4 weighted engine","Two confirmed anomalies do NOT stack the penalty (same score as one)", ()=>{
+  resetState();
+  pick("D4","Q1","Strong platform numbers plus recognition"); pick("D4","Q2","Growing/older still active");
+  pick("D4","Q3","Over 30% overseas w/ income records"); pick("D4","Q4","Two or more completed deals");
+  state.q5controls = {Q5A:"confirmed",Q5B:"confirmed",Q5C:"cleared",Q5D:"cleared"};
+  const r2 = computeD4();
+  state.q5controls = {Q5A:"confirmed",Q5B:"cleared",Q5C:"cleared",Q5D:"cleared"};
+  const r1 = computeD4();
+  eq(r2.pct, r1.pct, "non-stacking: 2-confirmed score must equal 1-confirmed score");
+});
+
+/* ---- Section: overall aggregation (framework_v4.0 Technical Spec §5) ---- */
+test("Overall aggregation","Standalone rounding check: a mean ending in .5 rounds upward (2.5→3, 3.5→4)", ()=>{
+  // With exactly 5 equally-weighted integer band indices, sum/5 can only land on .0/.2/.4/.6/.8 —
+  // an exact .5 tie is mathematically unreachable through overallBand() itself in this 5-dimension
+  // system, so the rounding rule is verified directly against the same expression the engine uses.
+  function roundHalfUp(mean){ let p = Math.round(mean + 1e-9); if((mean*2)%2===1) p = Math.ceil(mean); return p; }
+  eq(roundHalfUp(2.5), 3, "2.5 rounds up"); eq(roundHalfUp(3.5), 4, "3.5 rounds up"); eq(roundHalfUp(1.5), 2, "1.5 rounds up");
+});
+test("Overall aggregation","Technical Spec §5.2 worked example: bands 5,5,2,5,5 → mean 4.4 → prelim 4 → weakest-link caps to 3", ()=>{
+  const synth = {D1:{band:5},D2:{band:5},D3:{band:2},D4:{band:5},D5:{band:5}};
+  const o = overallBand(synth);
+  close(o.mean, 4.4, 0.001, "mean"); eq(o.prelim, 4, "preliminary band"); eq(o.lowest, 2, "lowest band"); eq(o.final, 3, "final band (2+1=3)");
+});
+test("Overall aggregation","Achievable decimal means round per standard rounding (mean 2.6 → 3, mean 2.4 → 2)", ()=>{
+  let synth = {D1:{band:3},D2:{band:3},D3:{band:3},D4:{band:2},D5:{band:2}}; // mean=13/5=2.6
+  eq(overallBand(synth).prelim, 3, "2.6 rounds to 3");
+  synth = {D1:{band:3},D2:{band:3},D3:{band:2},D4:{band:2},D5:{band:2}}; // mean=12/5=2.4
+  eq(overallBand(synth).prelim, 2, "2.4 rounds to 2");
+});
+test("Overall aggregation","Weakest-link cap never lets the overall band exceed lowest+1, even with 4 perfect dimensions", ()=>{
+  const synth = {D1:{band:5},D2:{band:5},D3:{band:5},D4:{band:5},D5:{band:1}};
+  const o = overallBand(synth);
+  eq(o.lowest, 1, "lowest"); eq(o.final, 2, "final capped to lowest(1)+1=2 despite mean="+o.mean);
+});
+test("Overall aggregation","All-Ready dimensions produce overall Band 5 with no weakest-link penalty", ()=>{
+  const synth = {D1:{band:5},D2:{band:5},D3:{band:5},D4:{band:5},D5:{band:5}};
+  const o = overallBand(synth);
+  eq(o.final, 5, "final band");
+});
+
+/* ---- Section: two-tier improvement list ---- */
+test("Improvement list","A hard-blocker-capped answer is classified Critical, not Recommended", ()=>{
+  resetState();
+  pick("D1","Q1","Full written agreements"); pick("D1","Q2","No"); pick("D1","Q3","No — I am the sole creator"); // Q2=No has cap:3
+  pick("D1","Q5","Explicit written waivers"); pick("D1","Q6","Some rights (split IP)"); // Q6 non-ideal, no cap
+  fullEvidenceAll();
+  const r = allDimResults();
+  const imp = improvementList(r);
+  const critLabels = imp.critical.map(i=>i.issue);
+  const recLabels = imp.recommended.map(i=>i.issue);
+  eq(critLabels.includes("No"), true, "capped answer must be Critical");
+  eq(recLabels.includes("Some rights (split IP)"), true, "non-capped suboptimal answer must be Recommended");
+});
+test("Improvement list","An answer discounted by D6 evidence (even without a cap) is promoted to Critical", ()=>{
+  resetState();
+  pick("D1","Q1","Some missing/unclear"); pick("D1","Q2","Yes, 100%"); pick("D1","Q3","No — I am the sole creator");
+  pick("D1","Q5","Explicit written waivers"); pick("D1","Q6","Yes, unconditional global rights");
+  fullEvidenceAll(); state.evidenceState.D1.Q1 = "partial"; // no cap on this option, but evidence gap should still force Critical
+  const r = allDimResults();
+  const imp = improvementList(r);
+  eq(imp.critical.some(i=>i.issue==="Some missing/unclear"), true, "evidence-discounted question must be Critical per Technical Spec §6.1");
+});
+test("Improvement list","D3's Cap-59 rights-restriction flag surfaces as a Critical item", ()=>{
+  resetState();
+  pick("D3","Q1","24+ months, no gap over 3 months"); pick("D3","Q2","Multiple matching documents");
+  pick("D3","Q3","Quarterly and mostly steady"); pick("D3","Q4","Three or more balanced sources"); pick("D3","Q5","Yes — advance not fully recouped");
+  const r = allDimResults();
+  const imp = improvementList(r);
+  eq(imp.critical.some(i=>i.dim==="D3"), true, "D3 cap59 flag must appear in Critical tier");
+});
+test("Improvement list","D4's confirmed anomaly tag surfaces as a Critical item", ()=>{
+  resetState();
+  state.q5controls = {Q5A:"confirmed",Q5B:"cleared",Q5C:"cleared",Q5D:"cleared"};
+  const imp = improvementList({});
+  eq(imp.critical.some(i=>i.dim==="D4"), true, "D4 confirmed anomaly must appear in Critical tier");
+});
+
+/* =========================================================================
+   RENDER REPORT
+========================================================================= */
+const passCount = results.filter(r=>r.pass).length;
+const failCount = results.length - passCount;
+const bySection = {};
+results.forEach(r=>{ (bySection[r.section] = bySection[r.section]||[]).push(r); });
+
+let html = `<h1>IP Investment Readiness Tool — Automated Test Suite</h1>
+<div class="sub">Runs the exact scoring/aggregation engine from IP_Readiness_Demo.html against ${results.length} test cases covering per-dimension scoring, branch logic, the D6 evidence discount, D3/D4's weighted formulas and caps, framework_v4.0's overall aggregation rules, and the two-tier improvement list.</div>
+<div class="summary">
+  <div class="stat pass"><b>${passCount}</b><span>Passed</span></div>
+  <div class="stat fail"><b>${failCount}</b><span>Failed</span></div>
+  <div class="stat"><b>${results.length}</b><span>Total</span></div>
+</div>`;
+
+Object.keys(bySection).forEach(sec=>{
+  html += `<div class="section-title">${sec}</div>`;
+  bySection[sec].forEach(r=>{
+    html += `<div class="tc ${r.pass?'pass':'fail'}">
+      <div class="icon">${r.pass?'✓':'✗'}</div>
+      <div>
+        <div class="name">${r.name}</div>
+        ${r.pass?'':`<div class="err">${r.error}</div>`}
+      </div>
+    </div>`;
+  });
+});
+
+document.getElementById("app").innerHTML = html;
+</script>
+</body>
+</html>
